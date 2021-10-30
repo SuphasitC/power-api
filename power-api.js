@@ -62,19 +62,19 @@ var insertObjToDatabase = (obj) => {
 //     );
 // }
 
-// var getData = async () => {
-//     var id = devicesId[Math.floor(Math.random() * devicesId.length)];
-//     try {
-//         const response = await axios.get(`http://localhost:3000/devices/${id}`);
-//         console.log(response);
-//     } catch (error) {
-//         console.error(error);
-//     }
-// }
+var insertMockedUpData = async () => {
+    var id = devicesId[Math.floor(Math.random() * devicesId.length)];
+    try {
+        const response = await axios.post(`http://localhost:3000/devices/${id}`);
+        console.log(response.data);
+    } catch (error) {
+        console.error(error);
+    }
+}
 
-// setInterval(() => {
-//     getData();
-// }, 3000);
+setInterval(() => {
+    insertMockedUpData();
+}, 3000);
 
 var getTimeStamp = () => {
     var today = new Date();
@@ -125,7 +125,7 @@ app.get('/devices/:deviceId', cors(), (req, res) => {
             var dbo = db.db("power-api");
             dbo.collection("information").find(queryObj).sort({ _id: -1 }).limit(1).toArray((err, value) => {
                 if (err) throw err;
-                console.log(value)
+                // console.log(value)
                 res.send(value[0]);
             });
         }
@@ -169,13 +169,26 @@ app.post('/devices/:deviceId', cors(), (req, res) => {
         json = { id: deviceId, ...json, timeStamp };
         if (devicesId.includes(deviceId)) {
             insertObjToDatabase(json);
-            console.log(json.values.variable[1].textValue[0]); //deviceId
-            console.log(json.values.variable[4].value[0]); //value
+            // console.log(json.values.variable[1].textValue[0]); //deviceId
+            // console.log(json.values.variable[4].value[0]); //value
             res.send(json);
         } else {
             res.status(400).send(`Not has this devices in the system.`);
         }
     });
+});
+
+app.get('/devices/:id/history/:query?', async (req, res) => {
+    var acceptedFilter = ['today', 'yesterday', 'thisWeek', 'thisMonth', 'specific'];
+    var acceptedInterval = ['5m', '15m', '1hr', 'raw'];
+    var deviceId = req.params.id;
+    var filteredBy = req.query.filterBy;
+    var interval = req.query.interval;
+
+    var canFilter = acceptedFilter.includes(filteredBy);
+    var isFilterWithInterval = acceptedInterval.includes(interval);
+
+    res.send(`canFilter = ${canFilter}, isFilterWithInterval = ${isFilterWithInterval}`);
 });
 
 //get all data of device
