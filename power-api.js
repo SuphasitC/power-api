@@ -4,6 +4,10 @@ const xml2js = require('xml2js');
 var cors = require('cors')
 const axios = require('axios');
 
+const WebSocket = require('ws');
+const webSocketPort = 4000;
+const ws = new WebSocket.Server({ port: webSocketPort });
+
 const app = express();
 app.use(cors());
 
@@ -301,4 +305,86 @@ app.listen(port, () => {
     console.log(`Power API is listening on port ${port}.`);
 });
 
-// today (5mins) -> 288 records
+//web socket
+
+
+
+ws.on('connection', (ws) => {
+    var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                                <values>
+                                    <variable>
+                                        <id>MDB1.DESCRIPTION</id>
+                                    </variable>
+                                    <variable>
+                                        <id>MDB1.NAME</id>
+                                        <textValue>MDB1</textValue>
+                                    </variable>
+                                    <variable>
+                                        <id>MDB1.PTIME</id>
+                                        <value>${Math.random() * 100000}</value>
+                                    </variable>
+                                    <variable>
+                                        <id>MDB1.STATUS</id>
+                                        <value>1.000000</value>
+                                    </variable>
+                                    <variable>
+                                        <id>MDB1.VDTTM</id>
+                                        <value>${Math.random() * 100000000000000}</value>
+                                    </variable>
+                                </values>`
+    ws.on('message', (deviceId) => {
+        var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+                                <values>
+                                    <variable>
+                                        <id>${deviceId}.DESCRIPTION</id>
+                                    </variable>
+                                    <variable>
+                                        <id>${deviceId}.NAME</id>
+                                        <textValue>${deviceId}</textValue>
+                                    </variable>
+                                    <variable>
+                                        <id>${deviceId}.PTIME</id>
+                                        <value>${Math.random() * 100000}</value>
+                                    </variable>
+                                    <variable>
+                                        <id>${deviceId}.STATUS</id>
+                                        <value>1.000000</value>
+                                    </variable>
+                                    <variable>
+                                        <id>${deviceId}.VDTTM</id>
+                                        <value>${Math.random() * 100000000000000}</value>
+                                    </variable>
+                                </values>`
+
+        xml2js.parseString(dataFromPowerStudio, (err, result) => {
+            if(err) {
+                throw err;
+            }
+            const jsonString = JSON.stringify(result, null, 4); //json string data from power studio
+            var json = JSON.parse(jsonString); //json data from power studio
+
+            if (devicesId.includes(deviceId)) {
+                // console.log(json.values.variable[1].textValue[0]); //deviceId
+                // console.log(json.values.variable[4].value[0]); //value
+                ws.send(json);
+            } else {
+                ws.send(`Not has this devices in the system.`);
+            }
+        });
+    });
+    ws.on('close', () => {
+        console.log('Disconnected from client web socket.');
+    });
+    ws.send('Connect to Power WebSocket');
+    
+    setInterval(() => {
+        xml2js.parseString(dataFromPowerStudio, (err, result) => {
+            if(err) {
+                throw err;
+            }
+            const jsonString = JSON.stringify(result, null, 4);
+            var json = JSON.parse(jsonString);
+            ws.send(json);
+        });
+    }, 3000);
+});
