@@ -41,7 +41,7 @@ var insertObjToDatabase = (obj) => {
         function(err, db) {
             if (err) throw err;
             var dbo = db.db("power-api");
-            dbo.collection("information").insertOne(obj, function(err, res) {
+            dbo.collection(`${obj.id}`).insertOne(obj, function(err, res) {
                 if (err) throw err;
             });
         }
@@ -63,10 +63,17 @@ var insertObjToDatabase = (obj) => {
 // }
 
 var insertMockedUpData = async () => {
-    var id = devicesId[Math.floor(Math.random() * devicesId.length)];
+    // var id = devicesId[Math.floor(Math.random() * devicesId.length)];
     try {
-        const response = await axios.post(`http://localhost:3000/devices/${id}`);
-        console.log(response.data);
+        var responseList = [];
+        for(var i = 0; i < devicesId.length; i++) {
+            var response = await axios.post(`http://localhost:3000/devices/${devicesId[i]}`);
+            responseList.push(response.data);
+        }
+        console.log(responseList);
+        responseList = [];
+        // const response = await axios.post(`http://localhost:3000/devices/${id}`);
+        // console.log(response.data);
     } catch (error) {
         console.error(error);
     }
@@ -74,7 +81,7 @@ var insertMockedUpData = async () => {
 
 setInterval(() => {
     insertMockedUpData();
-}, 3000);
+}, 60000);
 
 var getTimeStamp = () => {
     var today = new Date();
@@ -102,6 +109,53 @@ var insertZero = (time) => {
     return time;
 }
 
+var isValidDate = (dateString) => {
+    if (dateString === undefined) {
+        return false;
+    }
+    var regEx = /^\d{4}-\d{2}-\d{2}$/;
+    if(!dateString.match(regEx)) return false;  // Invalid format
+    var d = new Date(dateString);
+    var dNum = d.getTime();
+    if(!dNum && dNum !== 0) return false; // NaN value, Invalid date
+    return d.toISOString().slice(0,10) === dateString;
+  }
+
+var getFilterObject = (filterBy, [minDate, maxDate]) => {
+    var date = new Date();
+    var today = date.toISOString();
+    today = today.substring(0, 10);
+
+    var dateOfTomorrow = new Date();
+    dateOfTomorrow.setDate(dateOfTomorrow.getDate() + 1);
+    var tomorrow = dateOfTomorrow.toISOString();
+    tomorrow = tomorrow.substring(0, 10);
+
+    var dateOfYesterday = new Date();
+    dateOfYesterday.setDate(dateOfYesterday.getDate() - 1);
+    var yesterday = dateOfYesterday.toISOString();
+    yesterday = yesterday.substring(0, 10);
+
+    var isMinDateOrMaxDateIsUndefinded = minDate === undefined && maxDate === undefined
+
+    if (!isMinDateOrMaxDateIsUndefinded) {
+        var minDateString = minDate.substring(0, 10);
+        var maxDateString = maxDate.substring(0, 10);
+        console.log(maxDateString);
+        console.log(minDateString);
+    }
+
+    if (filterBy === 'today') {
+        return { created_on: { $gte: new Date(today), $lt: new Date(tomorrow) } };
+    } else if (filterBy == 'yesterday') {
+        return { created_on: { $gte: new Date(yesterday), $lt: new Date(today) } };
+    } else if (filterBy == 'specific') {
+        return !isMinDateOrMaxDateIsUndefinded ? { created_on: { $gte: new Date(minDateString), $lte: new Date(maxDateString) } }: { created_on: new Date('0001-01-01') };
+    } else {
+        return { created_on: new Date('0001-01-01') };
+    }
+}
+
 //get devices list
 app.get('/devices', cors(), (req, res) => {
     xml2js.parseString(devices, (err, result) => {
@@ -123,9 +177,8 @@ app.get('/devices/:deviceId', cors(), (req, res) => {
         function(err, db) {
             if (err) throw err;
             var dbo = db.db("power-api");
-            dbo.collection("information").find(queryObj).sort({ _id: -1 }).limit(1).toArray((err, value) => {
+            dbo.collection(`${deviceId}`).find(queryObj).sort({ _id: -1 }).limit(1).toArray((err, value) => {
                 if (err) throw err;
-                // console.log(value)
                 res.send(value[0]);
             });
         }
@@ -165,8 +218,10 @@ app.post('/devices/:deviceId', cors(), (req, res) => {
         }
         const jsonString = JSON.stringify(result, null, 4); //json string data from power studio
         var json = JSON.parse(jsonString); //json data from power studio
-        const timeStamp = getTimeStamp();
-        json = { id: deviceId, ...json, timeStamp };
+        const date = new Date().toISOString()
+        const created_on = new Date(date);
+
+        json = { id: deviceId, ...json, created_on };
         if (devicesId.includes(deviceId)) {
             insertObjToDatabase(json);
             // console.log(json.values.variable[1].textValue[0]); //deviceId
@@ -178,17 +233,44 @@ app.post('/devices/:deviceId', cors(), (req, res) => {
     });
 });
 
-app.get('/devices/:id/history/:query?', async (req, res) => {
+app.get('/devices/:id/history/', (req, res) => {
     var acceptedFilter = ['today', 'yesterday', 'thisWeek', 'thisMonth', 'specific'];
-    var acceptedInterval = ['5m', '15m', '1hr', 'raw'];
+    var acceptedInterval = ['5m', '15m', '1hr', '1d', 'raw'];
+
     var deviceId = req.params.id;
-    var filteredBy = req.query.filterBy;
+
+    var filterBy = req.query.filterBy;
     var interval = req.query.interval;
 
-    var canFilter = acceptedFilter.includes(filteredBy);
+    var minDate = req.query.minDate
+    var maxDate = req.query.maxDate
+
+    var canFilter = acceptedFilter.includes(filterBy);
     var isFilterWithInterval = acceptedInterval.includes(interval);
 
-    res.send(`canFilter = ${canFilter}, isFilterWithInterval = ${isFilterWithInterval}`);
+    if (canFilter) {
+        var filter = {};
+        if (filterBy == 'specific' && (isValidDate(minDate) && isValidDate(maxDate))) {
+            filter = getFilterObject(filterBy, [minDate, maxDate]);
+        } else {
+            filter = getFilterObject(filterBy, []);
+        }
+        console.log(filter)
+
+        MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
+            function(err, db) {
+                if (err) throw err;
+                var dbo = db.db("power-api");
+                dbo.collection(`${deviceId}`).find(filter).toArray((err, docs) => {
+                    if (err) throw err;
+                    res.send(docs)
+                });
+            }
+        );
+    } else {
+        console.log(`can't filter.`);
+        res.status(400).send(`Can't filter. (HTTP StatusCode == 400)`);
+    }
 });
 
 //get all data of device
@@ -200,7 +282,7 @@ app.get('/devices/:id/all', async (req, res) => {
             function(err, db) {
                 if (err) throw err;
                 var dbo = db.db("power-api");
-                dbo.collection("information").find(queryObj).toArray((err, docs) => {
+                dbo.collection(`${deviceId}`).find(queryObj).toArray((err, docs) => {
                     if (err) throw err;
                     res.send(docs);
                 });
@@ -218,3 +300,5 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
     console.log(`Power API is listening on port ${port}.`);
 });
+
+// today (5mins) -> 288 records
