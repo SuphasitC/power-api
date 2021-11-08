@@ -87,43 +87,40 @@ setInterval(() => {
     insertMockedUpData();
 }, 60000);
 
-var getTimeStamp = () => {
-    var today = new Date();
-    var day = insertZero(today.getDate() + "");
-    var month = (insertZero(today.getMonth() + 1) + "");
-    var year = insertZero(today.getFullYear() + "");
-    var hour = insertZero(today.getHours() + "");
-    var minute = insertZero(today.getMinutes() + "");
-    var second = insertZero(today.getSeconds() + "");
-
-    return {
-        day: day,
-        month: month,
-        year: year,
-        hour: hour,
-        minute: minute,
-        second: second
+var insertMockedUpData = async () => {
+    // var id = devicesId[Math.floor(Math.random() * devicesId.length)];
+    try {
+        var responseList = [];
+        for(var i = 0; i < devicesId.length; i++) {
+            var response = await axios.post(`http://localhost:3000/devices/${devicesId[i]}`);
+            responseList.push(response.data);
+        }
+        console.log(responseList);
+        responseList = [];
+        // const response = await axios.post(`http://localhost:3000/devices/${id}`);
+        // console.log(response.data);
+    } catch (error) {
+        console.error(error);
     }
 }
 
-var insertZero = (time) => {
-    if(time.length == 1) {
-        time = "0" + time;
-    }
-    return time;
-}
+// var isValidDate = (dateString) => {
+//     if (dateString === undefined) {
+//         return false;
+//     }
+//     var regEx = /^\d{4}-\d{2}-\d{2}$/;
+//     // var regEx = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
+//     if(!dateString.match(regEx)) return false;  // Invalid format
+//     var d = new Date(dateString);
+//     var dNum = d.getTime();
+//     if(!dNum && dNum !== 0) return false; // NaN value, Invalid date
+//     return d.toISOString().slice(0,10) === dateString;
+//   }
 
 var isValidDate = (dateString) => {
-    if (dateString === undefined) {
-        return false;
-    }
-    var regEx = /^\d{4}-\d{2}-\d{2}$/;
-    if(!dateString.match(regEx)) return false;  // Invalid format
-    var d = new Date(dateString);
-    var dNum = d.getTime();
-    if(!dNum && dNum !== 0) return false; // NaN value, Invalid date
-    return d.toISOString().slice(0,10) === dateString;
-  }
+    const _regExp  = new RegExp('^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(.[0-9]+)?(Z)?$');
+    return _regExp.test(dateString);
+}
 
 var getFilterObject = (filterBy, [minDate, maxDate]) => {
     var date = new Date();
@@ -142,19 +139,19 @@ var getFilterObject = (filterBy, [minDate, maxDate]) => {
 
     var isMinDateOrMaxDateIsUndefinded = minDate === undefined && maxDate === undefined
 
-    if (!isMinDateOrMaxDateIsUndefinded) {
-        var minDateString = minDate.substring(0, 10);
-        var maxDateString = maxDate.substring(0, 10);
-        console.log(maxDateString);
-        console.log(minDateString);
-    }
+    console.log(`🍪 today = ${today}`);
+    console.log(`🍪 yesterday = ${yesterday}`);
+    console.log(`🍪 tomorrow = ${tomorrow}`);
+    console.log(`🥠 minDate = ${minDate}`);
+    console.log(`🥠 maxDate = ${maxDate}`);
+    console.log(`🍿 isMinDateOrMaxDateIsUndefinded = ${isMinDateOrMaxDateIsUndefinded}`);
 
     if (filterBy === 'today') {
         return { created_on: { $gte: new Date(today), $lt: new Date(tomorrow) } };
     } else if (filterBy == 'yesterday') {
         return { created_on: { $gte: new Date(yesterday), $lt: new Date(today) } };
     } else if (filterBy == 'specific') {
-        return !isMinDateOrMaxDateIsUndefinded ? { created_on: { $gte: new Date(minDateString), $lte: new Date(maxDateString) } }: { created_on: new Date('0001-01-01') };
+        return !isMinDateOrMaxDateIsUndefinded ? { created_on: { $gte: new Date(minDate), $lte: new Date(maxDate) } }: { created_on: new Date('0001-01-01') };
     } else {
         return { created_on: new Date('0001-01-01') };
     }
@@ -252,6 +249,11 @@ app.get('/devices/:id/history/', (req, res) => {
     var canFilter = acceptedFilter.includes(filterBy);
     var isFilterWithInterval = acceptedInterval.includes(interval);
 
+    console.log(`minDate = ${minDate}`);
+    console.log(`maxDate = ${maxDate}`);
+    console.log(`isValidDateMinDate = ${isValidDate(minDate)}`);
+    console.log(`isValidDateMaxDate = ${isValidDate(maxDate)}`);
+
     if (canFilter) {
         var filter = {};
         if (filterBy == 'specific' && (isValidDate(minDate) && isValidDate(maxDate))) {
@@ -297,6 +299,66 @@ app.get('/devices/:id/all', async (req, res) => {
     }
 });
 
+app.post('/alarm/', cors(), (req, res) => {
+    var deviceId = req.query.deviceId;
+    var alarmType = req.query.alarmType;
+    var alertTimeString = req.query.alertDateTime;
+    var fixedTimeString = req.query.fixedDateTime;
+    console.log(alertTimeString)
+    console.log(fixedTimeString)
+    
+    const alertDateTimeString = new Date(alertTimeString).toISOString();
+    alertDateTime = new Date(alertDateTimeString);
+    const fixedDateTimeString = new Date(fixedTimeString).toISOString();
+    fixedDateTime = new Date(fixedDateTimeString);
+    
+    var json = { id: deviceId, alarmType: alarmType, alertDateTime: alertDateTime, fixedDateTime: fixedDateTime }; //json data from power studio
+    json = { ...json, description: 'เกิดรอยรั่วที่จุด A' };
+    
+    if (devicesId.includes(deviceId)) {
+        MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
+            function(err, db) {
+                if (err) throw err;
+                var dbo = db.db("power-api");
+                dbo.collection('alarm').insertOne(json, function(err, res) {
+                    if (err) throw err;
+                });
+            }
+        );
+        res.send(json);
+    } else {
+        res.status(400).send(`Not has this devices in the system.`);
+    }
+    
+});
+
+app.get('/alarm/all', (req, res) => {
+    MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
+        function(err, db) {
+            if (err) throw err;
+            var dbo = db.db("power-api");
+            dbo.collection('alarm').find({}).toArray((err, docs) => {
+                if (err) throw err;
+                res.send(docs);
+            });
+        }
+    );
+});
+
+app.get('/alarm/:deviceId', (req, res) => {
+    var deviceId = req.params.deviceId;
+    MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
+        function(err, db) {
+            if (err) throw err;
+            var dbo = db.db("power-api");
+            dbo.collection('alarm').find({ id: deviceId }).toArray((err, docs) => {
+                if (err) throw err;
+                res.send(docs);
+            });
+        }
+    );
+});
+
 app.get('/', (req, res) => {
     res.send('Power - API')
 });
@@ -306,9 +368,6 @@ app.listen(port, () => {
 });
 
 //web socket
-
-
-
 ws.on('connection', (ws) => {
     var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                                 <values>
@@ -366,7 +425,7 @@ ws.on('connection', (ws) => {
             if (devicesId.includes(deviceId)) {
                 // console.log(json.values.variable[1].textValue[0]); //deviceId
                 // console.log(json.values.variable[4].value[0]); //value
-                ws.send(json);
+                ws.send(jsonString);
             } else {
                 ws.send(`Not has this devices in the system.`);
             }
@@ -384,7 +443,7 @@ ws.on('connection', (ws) => {
             }
             const jsonString = JSON.stringify(result, null, 4);
             var json = JSON.parse(jsonString);
-            ws.send(json);
+            ws.send(jsonString);
         });
     }, 3000);
 });
