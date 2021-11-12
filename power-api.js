@@ -10,6 +10,8 @@ const ws = new WebSocket.Server({ port: webSocketPort });
 
 const app = express();
 app.use(cors());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json())
 
 const mongoUrl = 'mongodb://127.0.0.1:27017';
 const port = 3000;
@@ -39,7 +41,6 @@ var devicesId = ['MDB1-2', 'MDB1', 'MDB2', 'Solar3', 'Sol3'];
         - specific time (DateTime - DateTime) -> 5 mins/15 mins/1 hour/raw
 */
 
-
 var insertObjToDatabase = (obj) => {
     MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
         function(err, db) {
@@ -51,20 +52,6 @@ var insertObjToDatabase = (obj) => {
         }
     );
 }
-
-// async function findObjInDatabase (queryObj) {
-//     await MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
-//         function(err, db) {
-//             if (err) throw err;
-//             var dbo = db.db("power-api");
-//             dbo.collection("information").find(queryObj).toArray((err, docs) => {
-//                 if (err) throw err;
-//                 console.log(docs)
-//                 return(docs);
-//             });
-//         }
-//     );
-// }
 
 var insertMockedUpData = async () => {
     // var id = devicesId[Math.floor(Math.random() * devicesId.length)];
@@ -299,11 +286,12 @@ app.get('/devices/:id/all', async (req, res) => {
     }
 });
 
-app.post('/alarm/', cors(), (req, res) => {
-    var deviceId = req.query.deviceId;
-    var alarmType = req.query.alarmType;
-    var alertTimeString = req.query.alertDateTime;
-    var fixedTimeString = req.query.fixedDateTime;
+app.post('/alarm/save-history', cors(), (req, res) => {
+    var deviceId = req.body.deviceId;
+    var alarmType = req.body.alarmType;
+    var alertTimeString = req.body.alertDateTime;
+    var fixedTimeString = req.body.fixedDateTime;
+    var description = req.body.description;
     console.log(alertTimeString)
     console.log(fixedTimeString)
     
@@ -312,8 +300,7 @@ app.post('/alarm/', cors(), (req, res) => {
     const fixedDateTimeString = new Date(fixedTimeString).toISOString();
     fixedDateTime = new Date(fixedDateTimeString);
     
-    var json = { id: deviceId, alarmType: alarmType, alertDateTime: alertDateTime, fixedDateTime: fixedDateTime }; //json data from power studio
-    json = { ...json, description: 'เกิดรอยรั่วที่จุด A' };
+    var json = { id: deviceId, alarmType: alarmType, alertDateTime: alertDateTime, fixedDateTime: fixedDateTime, description: description }; //json data from power studio
     
     if (devicesId.includes(deviceId)) {
         MongoClient.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true },
