@@ -30,6 +30,8 @@ var devices = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 
 var devicesId = ['MDB1-2', 'MDB1', 'MDB2', 'Solar3', 'Sol3'];
 
+var realDevices = [];
+
 /*
     1. get devices list then use gotten id to get value from .../variableValue every 3 seconds (export value to web socket)
     2. keep history (from 1.) every 1 minute (1 value/minute)
@@ -54,7 +56,6 @@ var insertObjToDatabase = (obj) => {
 }
 
 var insertMockedUpData = async () => {
-    // var id = devicesId[Math.floor(Math.random() * devicesId.length)];
     try {
         var responseList = [];
         for(var i = 0; i < devicesId.length; i++) {
@@ -63,8 +64,35 @@ var insertMockedUpData = async () => {
         }
         console.log(responseList);
         responseList = [];
-        // const response = await axios.post(`http://localhost:3000/devices/${id}`);
-        // console.log(response.data);
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+var getDevicesFromPowerStudio = async () => {
+    try {
+        var response = await axios.get(`${powerUrl}/services/chargePointsInterface/devices.xml?api_key=special-key`);
+        console.log(response.data)
+        xml2js.parseString(dataFromPowerStudio, (err, result) => {
+            if(err) {
+                throw err;
+            }
+            const jsonString = JSON.stringify(result, null, 4);
+            var json = JSON.parse(jsonString);
+            json.devices.id.forEach((device) => {
+                console.log(device)
+                // add real device to list.
+            })
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+var readDataFromRealDevicePowerStudio = async () => {
+    try {
+        var response = await axios.get(`${powerUrl}/services/chargePointsInterface/variableValue.xml?id=MDB1&api_key=special-key`);
+        console.log(response.data)
     } catch (error) {
         console.error(error);
     }
@@ -75,7 +103,6 @@ setInterval(() => {
 }, 60000);
 
 var insertMockedUpData = async () => {
-    // var id = devicesId[Math.floor(Math.random() * devicesId.length)];
     try {
         var responseList = [];
         for(var i = 0; i < devicesId.length; i++) {
@@ -84,25 +111,10 @@ var insertMockedUpData = async () => {
         }
         console.log(responseList);
         responseList = [];
-        // const response = await axios.post(`http://localhost:3000/devices/${id}`);
-        // console.log(response.data);
     } catch (error) {
         console.error(error);
     }
 }
-
-// var isValidDate = (dateString) => {
-//     if (dateString === undefined) {
-//         return false;
-//     }
-//     var regEx = /^\d{4}-\d{2}-\d{2}$/;
-//     // var regEx = /\d{4}-[01]\d-[0-3]\dT[0-2]\d:[0-5]\d:[0-5]\d\.\d+([+-][0-2]\d:[0-5]\d|Z)/
-//     if(!dateString.match(regEx)) return false;  // Invalid format
-//     var d = new Date(dateString);
-//     var dNum = d.getTime();
-//     if(!dNum && dNum !== 0) return false; // NaN value, Invalid date
-//     return d.toISOString().slice(0,10) === dateString;
-//   }
 
 var isValidDate = (dateString) => {
     const _regExp  = new RegExp('^(-?(?:[1-9][0-9]*)?[0-9]{4})-(1[0-2]|0[1-9])-(3[01]|0[1-9]|[12][0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(.[0-9]+)?(Z)?$');
@@ -355,76 +367,253 @@ app.listen(port, () => {
 });
 
 //web socket
-ws.on('connection', (ws) => {
-    var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                                <values>
-                                    <variable>
-                                        <id>MDB1.DESCRIPTION</id>
-                                    </variable>
-                                    <variable>
-                                        <id>MDB1.NAME</id>
-                                        <textValue>MDB1</textValue>
-                                    </variable>
-                                    <variable>
-                                        <id>MDB1.PTIME</id>
-                                        <value>${Math.random() * 100000}</value>
-                                    </variable>
-                                    <variable>
-                                        <id>MDB1.STATUS</id>
-                                        <value>1.000000</value>
-                                    </variable>
-                                    <variable>
-                                        <id>MDB1.VDTTM</id>
-                                        <value>${Math.random() * 100000000000000}</value>
-                                    </variable>
-                                </values>`
-    ws.on('message', (deviceId) => {
-        var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-                                <values>
-                                    <variable>
-                                        <id>${deviceId}.DESCRIPTION</id>
-                                    </variable>
-                                    <variable>
-                                        <id>${deviceId}.NAME</id>
-                                        <textValue>${deviceId}</textValue>
-                                    </variable>
-                                    <variable>
-                                        <id>${deviceId}.PTIME</id>
-                                        <value>${Math.random() * 100000}</value>
-                                    </variable>
-                                    <variable>
-                                        <id>${deviceId}.STATUS</id>
-                                        <value>1.000000</value>
-                                    </variable>
-                                    <variable>
-                                        <id>${deviceId}.VDTTM</id>
-                                        <value>${Math.random() * 100000000000000}</value>
-                                    </variable>
-                                </values>`
+// ws.on('connection', (ws) => {
+//     var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+//                                 <values>
+//                                     <variable>
+//                                         <id>MDB1.DESCRIPTION</id>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>MDB1.NAME</id>
+//                                         <textValue>MDB1</textValue>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>MDB1.PTIME</id>
+//                                         <value>${Math.random() * 100000}</value>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>MDB1.STATUS</id>
+//                                         <value>1.000000</value>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>MDB1.VDTTM</id>
+//                                         <value>${Math.random() * 100000000000000}</value>
+//                                     </variable>
+//                                 </values>`
+//     ws.on('message', (deviceId) => {
+//         var dataFromPowerStudio = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+//                                 <values>
+//                                     <variable>
+//                                         <id>${deviceId}.DESCRIPTION</id>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>${deviceId}.NAME</id>
+//                                         <textValue>${deviceId}</textValue>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>${deviceId}.PTIME</id>
+//                                         <value>${Math.random() * 100000}</value>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>${deviceId}.STATUS</id>
+//                                         <value>1.000000</value>
+//                                     </variable>
+//                                     <variable>
+//                                         <id>${deviceId}.VDTTM</id>
+//                                         <value>${Math.random() * 100000000000000}</value>
+//                                     </variable>
+//                                 </values>`
 
-        xml2js.parseString(dataFromPowerStudio, (err, result) => {
+//         xml2js.parseString(dataFromPowerStudio, (err, result) => {
+//             if(err) {
+//                 throw err;
+//             }
+//             const jsonString = JSON.stringify(result, null, 4); //json string data from power studio
+//             var json = JSON.parse(jsonString); //json data from power studio
+
+//             if (devicesId.includes(deviceId)) {
+//                 // console.log(json.values.variable[1].textValue[0]); //deviceId
+//                 // console.log(json.values.variable[4].value[0]); //value
+//                 ws.send(jsonString);
+//             } else {
+//                 ws.send(`Not has this devices in the system.`);
+//             }
+//         });
+//     });
+//     ws.on('close', () => {
+//         console.log('Disconnected from client web socket.');
+//     });
+//     ws.send('Connect to Power WebSocket');
+    
+//     setInterval(() => {
+//         xml2js.parseString(dataFromPowerStudio, (err, result) => {
+//             if(err) {
+//                 throw err;
+//             }
+//             const jsonString = JSON.stringify(result, null, 4);
+//             var json = JSON.parse(jsonString);
+//             ws.send(jsonString);
+//         });
+//     }, 3000);
+// });
+
+/* 
+    Real::
+    
+    getDevices -> /services/chargePointsInterface/devices.xml?api_key=special-key
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <devices>
+            <id>MDB1111111111111111</id>
+            <id>LOF1</id>
+            <id>LC1-1-2</id>
+            <id>LF1</id>
+            <id>LF2</id>
+            <id>LF3</id>
+            <id>LF4</id>
+            <id>LC1-1</id>
+            <id>LW1</id>
+            <id>DP-1</id>
+            <id>Main1</id>
+            <id>Main2</id>
+            <id>LC2-1</id>
+            <id>LC2-1-2</id>
+            <id>LOF2-1-2</id>
+            <id>LOF2-1-1</id>
+            <id>LC2-1-1</id>
+            <id>AirPump</id>
+            <id>Solar1</id>
+            <id>Solar2</id>
+            <id>Welding</id>
+            <id>Color1</id>
+            <id>Color2</id>
+            <id>MDB3</id>
+            <id>A1</id>
+            <id>A2</id>
+            <id>B2</id>
+            <id>B1</id>
+            <id>MDB4</id>
+            <id>DBF2</id>
+            <id>Main</id>
+            <id>Solar3</id>
+            <id>MDB5</id>
+            <id>MDB 5</id>
+            <id>BAS</id>
+            <id>BAS01</id>
+            <id>test1</id>
+            <id>aaaa</id>
+        </devices>
+
+    getVariableValue (WebSocket) -> /services/chargePointsInterface/variableValue.xml?id=LF1&api_key=special-key
+    <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <values>
+        <variable>
+            <id>LF1.AE</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.AI1</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.AI2</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.AI3</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.APIS</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.APPIS</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.DESCRIPTION</id>
+        </variable>
+        <variable>
+            <id>LF1.FRE</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.NAME</id>
+            <textValue>LF1</textValue>
+        </variable>
+        <variable>
+            <id>LF1.PFIS</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.RPIS</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.STATUS</id>
+            <value>18.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.VDTTM</id>
+            <value>01011999003545</value>
+        </variable>
+        <variable>
+            <id>LF1.VI1</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.VI12</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.VI2</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.VI23</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.VI3</id>
+            <value>0.000000</value>
+        </variable>
+        <variable>
+            <id>LF1.VI31</id>
+            <value>0.000000</value>
+        </variable>
+        </values>
+
+*/
+
+
+//web socket (Real)
+ws.on('connection', (ws) => {
+    ws.on('message', async (deviceId) => {
+        try {
+            var response = await axios.get(`${powerUrl}/services/chargePointsInterface/variableValue.xml?id=${deviceId}&api_key=special-key`);
+            console.log(response.data)
+        } catch (error) {
+            console.error(error);
+        }
+        xml2js.parseString(response.data, (err, result) => {
             if(err) {
                 throw err;
             }
-            const jsonString = JSON.stringify(result, null, 4); //json string data from power studio
-            var json = JSON.parse(jsonString); //json data from power studio
+            const jsonString = JSON.stringify(result, null, 4);
+            var json = JSON.parse(jsonString);
 
             if (devicesId.includes(deviceId)) {
-                // console.log(json.values.variable[1].textValue[0]); //deviceId
-                // console.log(json.values.variable[4].value[0]); //value
                 ws.send(jsonString);
             } else {
                 ws.send(`Not has this devices in the system.`);
             }
         });
     });
+
     ws.on('close', () => {
         console.log('Disconnected from client web socket.');
     });
+
     ws.send('Connect to Power WebSocket');
     
-    setInterval(() => {
-        xml2js.parseString(dataFromPowerStudio, (err, result) => {
+    setInterval( async () => {
+        try {
+            var response = await axios.get(`${powerUrl}/services/chargePointsInterface/variableValue.xml?id=MDB1&api_key=special-key`);
+            console.log(response.data)
+        } catch (error) {
+            console.error(error);
+        }
+        xml2js.parseString(response.data, (err, result) => {
             if(err) {
                 throw err;
             }
